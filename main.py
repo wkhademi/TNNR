@@ -11,43 +11,47 @@ OPT = {'admm': optimizers.ADMM,
        'apgl': optimizers.APGL}
 
 
-def solve(M, r, config):
+def solve(M_obs, observed, r, config):
     '''
-    Iterative scheme described in Algorithm 1 of "Matrix Completion via Truncated
+    Iterative scheme described in Algorithm 1 of "Matrix Completion by Truncated
     Nuclear Norm Regularization" by Zhang et al.
 
     Args:
-        M: matrix containing observed data
+        M_obs: observed portion of image
+        observed: indicator matrix indicating whether index in image is observed or not
         r: number for truncated nuclear norm (i.e., truncated nuclear norm is
          defined as sum of min(m,n)-r minimum singular values)
 
     Returns:
-        X: completed/inpainted matrix
+        X_sol: completed/inpainted image
     '''
     # intialize optimizer used at each iteration
     opt = OPT[config.optimizer]
     optimizer = opt(config.opt_max_itrs, config.opt_tol, config)
 
-    X = M  # initialize X_0 to observed matrix
+    X_sol = M_obs
 
     # solve for completed matrix
-    for iter in range(config.alg_max_itrs):
-        # STEP 1: compute SVD of current iterate and get truncated
-        #         columns of U and V
-        A, S, B = utils.truncated_svd(X)
+    for c in range(num_channels):
+        X = M_obs[..., c]  # initialize X_0 to M_obs
 
-        # STEP 2: update iterate by solving (17) or (26)
-        X_new = optimizer.minimize(X, A, B)
+        for iter in range(config.alg_max_itrs):
+            # STEP 1: compute SVD of current iterate and get truncated
+            #         columns of U and V
+            A, S, B = utils.truncated_svd(X, r)
 
-        # check stopping criteria
-        if np.linalg.norm(X_new - X) <= config.tol:
-            break
+            # STEP 2: update iterate by solving (17) or (26)
+            X_new = optimizer.minimize(X, A, B, M_obs[..., c], observed[..., c])
 
-        X = X_new
+            # check stopping criteria
+            if np.linalg.norm(X_new - X) <= config.tol:
+                break
 
-    X = X_new
+            X = X_new
 
-    return X
+        X_sol[..., c] = X_new
+
+    return X_sol
 
 
 def runner(config):

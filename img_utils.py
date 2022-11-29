@@ -8,6 +8,12 @@ def load_data(data_root, dataset, img):
     pass
 
 
+def generate_synthetic_data(m, n):
+    '''
+    '''
+    pass
+
+
 def add_noise(data):
     pass
 

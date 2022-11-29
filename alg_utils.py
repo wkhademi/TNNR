@@ -44,11 +44,15 @@ def tnn(S, r):
     return norm
 
 
-def shrinkage_operator(S, tau):
+def shrinkage_operator(X, tau):
     '''
     Singular value shrinkage operator defined in equation (15) of "Matrix
-    Completion via Truncated Nuclear Norm Regularization" by Zhang et al.
+    Completion by Truncated Nuclear Norm Regularization" by Zhang et al.
 
-    D_tau(S) = diag{max(sigma_i - tau, 0)}
+    D_tau(X) = U*D_tau(S)*V^T, where D_tau(S) = diag{max(sigma_i - tau, 0)}
     '''
-    pass
+    U, s, Vh = np.linalg.svd(X, full_matrices=False)
+    s = np.maximum(s - tau, 0)
+    X = U @ np.diag(S) @ Vh
+
+    return X
