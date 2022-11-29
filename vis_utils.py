@@ -4,6 +4,7 @@ import matplotlib.pyplot as plt
 
 def plot_error_vs_num_itrs(error, log=False):
     '''
+
     '''
     pass
 
