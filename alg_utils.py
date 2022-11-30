@@ -17,7 +17,7 @@ def truncated_svd(X, r):
     '''
     U, s, Vh = np.linalg.svd(X)
     S = np.diag(s)
-    V = V.T
+    V = Vh.T
 
     # truncate U and V
     A = U[:, :r].T
@@ -53,6 +53,6 @@ def shrinkage_operator(X, tau):
     '''
     U, s, Vh = np.linalg.svd(X, full_matrices=False)
     s = np.maximum(s - tau, 0)
-    X = U @ np.diag(S) @ Vh
+    X = U @ np.diag(s) @ Vh
 
     return X

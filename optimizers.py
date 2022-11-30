@@ -1,12 +1,12 @@
 import numpy as np
 
-from abc import ABC
+from abc import ABC, abstractmethod
 
 import alg_utils
 
 
 class Optimizer(ABC):
-    def __init__(self, max_itrs=100, tol=1e-4, **kwargs):
+    def __init__(self, max_itrs=100, tol=1e-4):
         self.max_itrs = max_itrs
         self.tol = tol
 
@@ -22,16 +22,15 @@ class ADMM(Optimizer):
     '''
     name = 'ADMM'
 
-    def __init__(self, max_itrs=100, tol=1e-4, **kwargs):
-        super(ADMM, self).__init__(max_itrs, tol, kwargs)
+    def __init__(self, max_itrs, tol, config):
+        super(ADMM, self).__init__(max_itrs, tol)
 
-        self.rho = kwargs['rho']
+        self.rho = config.rho
 
     def minimize(self, X, A, B, M_obs, observed):
         # indiciator matrix indicating missing portions in image
         missing = np.ones_like(observed) - observed
 
-        X = M_obs  # initialize X_1 to observed matrix
         W = X  # from constraint X = W in (17)
         Y = X  # initialize dual variable to X_1
 
@@ -68,33 +67,32 @@ class APGL(Optimizer):
     '''
     name = 'APGL'
 
-    def __init__(self, **kwargs):
-        super(APGL, self).__init__(max_itrs, tol, kwargs)
+    def __init__(self, max_itrs, tol, config):
+        super(APGL, self).__init__(max_itrs, tol)
 
-        self.lambda = kwargs['lambda']
+        self.lam = config.lam
 
     def minimize(self, X, A, B, M_obs, observed):
         t = 1
-        X = M_obs  # initialize X_1 to observed matrix
-        X_prev = X
         Y = X  # initialize extrapolation point to X_1
 
         for itr in range(self.max_itrs):
             # STEP 1: update X iterate using shrinkage operator
-            grad_f = A.T @ B - self.lambda*(Y*observed - M_obs)
+            grad_f = A.T @ B - self.lam*(Y - M_obs)*observed
             X_new = alg_utils.shrinkage_operator(Y + t*grad_f, t)
 
             # STEP 2: update t iterate (same as nesterov's acceleration update)
             t_new = (1 + np.sqrt(1 + 4*(t**2))) / 2.
 
             # STEP 3: update Y iterate (extrapolate point from current and previous X iterate)
-            Y_new = X + ((t - 1) / t_new)*(X - X_prev)
+            Y_new = X_new + ((t - 1) / t_new)*(X_new - X)
+
+            print(np.linalg.norm(X_new, 'nuc') - np.trace(A@X_new@B.T) + (self.lam/2)*np.linalg.norm((X_new - M_obs)*observed)**2)
 
             # check stopping criteria
             if np.linalg.norm(X_new - X) <= self.tol:
                 break
 
-            X_prev = X
             X = X_new
             t = t_new
             Y = Y_new
