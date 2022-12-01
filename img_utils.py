@@ -2,6 +2,8 @@ import os
 import numpy as np
 import matplotlib.pyplot as plt
 
+from PIL import Image
+
 
 def save(X, path):
     '''
@@ -29,22 +31,53 @@ def add_noise(X, observed, sigma):
     return X_noisy
 
 
-def corrupt(X, corruption, **kwargs):
+def load_mask(data_root, mask, height, width):
     '''
+    Load an already created mask from directory.
+    '''
+    mask_path = os.path.join(data_root, 'masks', 'block_%s.bmp'%mask)
+    mask = Image.open(mask_path)
+    mask = mask.resize((width, height))
+    observed = np.asarray(mask) / 255
+
+    return observed.astype(np.int32)
+
+
+def corrupt(X, corruption, data_root, config):
+    '''
+    Corrupt image using a specified masking type.
     '''
     if corruption == 'drop':
-        pass
+        drop_rate = config.rate
+        p = np.random.rand(*X.shape[:2])
+        observed = np.where(p[..., None] >= drop_rate, 1 , 0)
+        observed = np.broadcast_to(observed, X.shape)
     elif corruption == 'text':
-        pass
+        observed = load_mask(data_root, 'text', *X.shape[:2])
     elif corruption == 'block':
-        pass
+        observed = load_mask(data_root, config.block_type, *X.shape[:2])
+
+    X_obs = X*observed
+
+    return X_obs, observed
 
 
-def load_data(data_root, dataset, img, corruption, **kwargs):
+def load_data(data_root, dataset, img_num, corruption, config):
     '''
     Load ground truth image and generate a corrupted version of it.
     '''
-    pass
+    # load image
+    img_path = os.path.join(data_root, dataset, '%d.jpg'%img_num)
+    img = Image.open(img_path)
+    X_gt = np.asarray(img)
+
+    # generate corruption of image
+    X_obs, observed = corrupt(X_gt, corruption, data_root, config)
+
+    # add Gaussian white noise to observed entries
+    X_obs = add_noise(X_obs, observed, config.sigma)
+
+    return X_gt, X_obs, observed
 
 
 def generate_synthetic_data(m, n, r, p, sigma):
@@ -60,7 +93,7 @@ def generate_synthetic_data(m, n, r, p, sigma):
     Returns:
         M: ground truth matrix
         M_obs: observed matrix
-        observed
+        observed: indicator matrix indicating observed entries in M_obs
     '''
     # generate synthetic matrix with rank r
     M_L = np.random.randn(m, r)

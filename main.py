@@ -18,7 +18,8 @@ def solve(X_gt, M_obs, observed, r, config):
     Nuclear Norm Regularization" by Zhang et al.
 
     Args:
-        M_obs: observed portion of image
+        X_gt: ground truth image
+        M_obs: observed portion of image X_gt
         observed: indicator matrix indicating whether index in image is observed or not
         r: number for truncated nuclear norm (i.e., truncated nuclear norm is
          defined as sum of min(m,n)-r minimum singular values)
@@ -30,11 +31,13 @@ def solve(X_gt, M_obs, observed, r, config):
     opt = OPT[config.optimizer]
     optimizer = opt(config.opt_max_itrs, config.opt_tol, config)
 
-    X_sol = M_obs
+    X_sol = np.copy(M_obs)
 
     # solve for completed matrix (complete matrix per channel)
     num_channels = M_obs.shape[-1]
     for c in range(num_channels):
+        M_norm = np.linalg.norm(M_obs[..., c])
+
         X = M_obs[..., c]  # initialize X_1 to M_obs
 
         for iter in range(config.alg_max_itrs):
@@ -46,15 +49,18 @@ def solve(X_gt, M_obs, observed, r, config):
             X_new = optimizer.minimize(X, A, B, M_obs[..., c], observed[..., c])
 
             # check stopping criteria
-            if np.linalg.norm(X_new - X) <= config.alg_tol:
+            if np.linalg.norm(X_new - X) / M_norm <= config.alg_tol:
                 break
 
             X = X_new
 
-            error = metric_utils.error(X[...,None], X_gt, observed)
-            print('r: %d, error: %f'%(r, error))
+            error = metric_utils.error(X, X_gt[..., c], observed[..., c])
+            print('error (channel: %d, r: %d): %f'%(c, r, error))
 
         X_sol[..., c] = X_new
+
+    psnr = metric_utils.PSNR(X_sol, X_gt, observed)
+    print('r: %d, PSNR: %f'%(r, psnr))
 
     return X_sol
 
@@ -63,12 +69,12 @@ def runner(config):
     # load data
     if config.dataset == 'synthetic':  # generate synthetic image
         m, n = config.img_size
-        r = config.r
-        p = config.p
-        sigma = config.sigma
-        X_gt, X_obs, observed = img_utils.generate_synthetic_data(m, n, r, p, sigma)
-    #else:
-    #    X_gt, X_obs, observed = img_utils.load_data()
+        X_gt, X_obs, observed = img_utils.generate_synthetic_data(m, n, config.r,
+                                                                  config.p, config.sigma)
+    else:  # load image and generate corruption of it
+        X_gt, X_obs, observed = img_utils.load_data(config.data_root, config.dataset,
+                                                    config.img_num, config.corruption,
+                                                    config)
 
     # solve for complete image (solve for all r \in [min_rank, max_rank] and select best)
     best_error = 1e10
@@ -116,18 +122,19 @@ if __name__ == '__main__':
         help='Minimum assumed rank of matrix.')
     parser.add_argument('--max_rank', type=int, default=20,
         help='Maximum assumed rank of matrix.')
-    parser.add_argument('--alg_max_itrs', type=int, default=100,
+    parser.add_argument('--alg_max_itrs', type=int, default=10,
         help='max number of iterations to run algorithm for.')
     parser.add_argument('--opt_max_itrs', type=int, default=100,
         help='max number of iterations to run optimizer for at each iteration of algorithm.')
-    parser.add_argument('--alg_tol', type=float, default=1e-4,
+    parser.add_argument('--alg_tol', type=float, default=1e-5,
         help='Tolerance for stopping criteria of algorithm.')
-    parser.add_argument('--opt_tol', type=float, default=1e-4,
+    parser.add_argument('--opt_tol', type=float, default=1e-5,
         help='Tolerance for stopping criteria of optimizer used at each iteration.')
     parser.add_argument('--rho', type=float, default=1.,
         help='weighting parameter for augmented Lagrangian used by ADMM.')
     parser.add_argument('--lam', type=float, default=0.06,
         help='weighting parameter used by APGL for soft-constraint formulation.')
+    parser.add_argument('--clip', action='store_true')
     config = parser.parse_args()
 
     print(config)

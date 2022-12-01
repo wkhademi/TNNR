@@ -21,9 +21,9 @@ def MSE(X_sol, X_gt, observed):
             MSE = (error_r**2 + error_g**2 + error_b**2) / 3N
     '''
     # compute error for each channel
-    error_r = error(X_sol[..., 0], X_gt[..., 0], observed)
-    error_g = error(X_sol[..., 1], X_gt[..., 1], observed)
-    error_b = error(X_sol[..., 2], X_gt[..., 2], observed)
+    error_r = error(X_sol[..., 0], X_gt[..., 0], observed[..., 0])
+    error_g = error(X_sol[..., 1], X_gt[..., 1], observed[..., 1])
+    error_b = error(X_sol[..., 2], X_gt[..., 2], observed[..., 2])
 
     squared_error = error_r**2 + error_g**2 + error_b**2
 
