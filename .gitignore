@@ -1,1 +1,3 @@
 __pycache__/
+corrupt/real/*.jpg
+results/real/*.jpg

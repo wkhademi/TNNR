@@ -6,6 +6,7 @@ import img_utils
 import alg_utils
 import metric_utils
 import optimizers
+import matplotlib.pyplot as plt
 
 
 OPT = {'admm': optimizers.ADMM,
@@ -54,13 +55,7 @@ def solve(X_gt, M_obs, observed, r, config):
 
             X = X_new
 
-            error = metric_utils.error(X, X_gt[..., c], observed[..., c])
-            print('error (channel: %d, r: %d): %f'%(c, r, error))
-
         X_sol[..., c] = X_new
-
-    psnr = metric_utils.PSNR(X_sol, X_gt, observed)
-    print('r: %d, PSNR: %f'%(r, psnr))
 
     return X_sol
 
@@ -76,15 +71,36 @@ def runner(config):
                                                     config.img_num, config.corruption,
                                                     config)
 
-    # solve for complete image (solve for all r \in [min_rank, max_rank] and select best)
-    best_error = 1e10
-    best_psnr = 0
+    num_channels = X_obs.shape[-1]
+    best_metric = 1e10 if num_channels == 1 else -1e10
+    best_r = 0
     best_X_sol = X_obs
+
+    # solve for complete image (solve for all r \in [min_rank, max_rank] and select best)
     for r in range(config.min_rank, config.max_rank+1):
         X_sol = solve(X_gt, X_obs, observed, r, config)
 
-    # save best image inpainting result
+        # evaluate metric
+        if num_channels == 1:
+            metric = metric_utils.error(X_sol, X_gt, observed)
+            better = metric < best_metric
+        elif num_channels == 3:
+            metric = metric_utils.PSNR(X_sol, X_gt, observed)
+            better = metric > best_metric
 
+        if better:
+            best_metric = metric
+            best_r = r
+            best_X_sol = X_sol
+
+    # print metric for best image completion (i.e., best choice of r)
+    metric = 'Error' if num_channels == 1 else 'PSNR'
+    print('%s (r = %d): %f'%(metric, best_r, best_metric))
+
+    # save best image inpainting result
+    if config.dataset != 'synthetic':
+        img_utils.save(X_obs, 'corrupt/', config.dataset, config.img_num)
+        img_utils.save(X_sol, 'results/', config.dataset, config.img_num)
 
 
 if __name__ == '__main__':

@@ -8,7 +8,7 @@ def error(X_sol, X_gt, observed):
             error = ||(X_sol - X_gt)_miss||_F
     '''
     missing = np.ones_like(observed) - observed
-    error = np.linalg.norm((X_sol - X_gt)*missing)
+    error = np.linalg.norm(255.*(X_sol - X_gt)*missing)
 
     return error
 

@@ -5,13 +5,14 @@ import matplotlib.pyplot as plt
 from PIL import Image
 
 
-def save(X, path):
+def save(X, root, dataset, img_num):
     '''
     Save image to specified directory.
     '''
+    save_path = os.path.join(root, dataset, '%d.jpg'%img_num)
     plt.axis('off')
     plt.imshow(X)
-    plt.savefig(path, bbox_inches='tight')
+    plt.savefig(save_path, bbox_inches='tight')
 
 
 def add_noise(X, observed, sigma):
@@ -38,9 +39,9 @@ def load_mask(data_root, mask, height, width):
     mask_path = os.path.join(data_root, 'masks', 'block_%s.bmp'%mask)
     mask = Image.open(mask_path)
     mask = mask.resize((width, height))
-    observed = np.asarray(mask) / 255
+    observed = np.asarray(mask) / 255.
 
-    return observed.astype(np.int32)
+    return observed
 
 
 def corrupt(X, corruption, data_root, config):
@@ -69,7 +70,7 @@ def load_data(data_root, dataset, img_num, corruption, config):
     # load image
     img_path = os.path.join(data_root, dataset, '%d.jpg'%img_num)
     img = Image.open(img_path)
-    X_gt = np.asarray(img)
+    X_gt = np.asarray(img) / 255.
 
     # generate corruption of image
     X_obs, observed = corrupt(X_gt, corruption, data_root, config)

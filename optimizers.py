@@ -65,8 +65,8 @@ class ADMM(Optimizer):
             Y = Y_new
             obj_val = obj_val_new
 
-        X = X_new*missing + M_obs  # fix values at observed entries
-        X = np.minimum(np.maximum(X, 0.), 255.) if self.clip else X
+        #X = X_new*missing + M_obs  # fix values at observed entries
+        X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
 
         return X
 
@@ -109,7 +109,7 @@ class APGL(Optimizer):
 
             # check if objective value got worse, if so stop
             if obj_val_new > obj_val:
-                X = np.minimum(np.maximum(X, 0.), 255.) if self.clip else X
+                X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
                 return X
 
             # check stopping criteria
@@ -122,6 +122,6 @@ class APGL(Optimizer):
             Y = Y_new
             obj_val = obj_val_new
 
-        X = np.minimum(np.maximum(X_new, 0.), 255.) if self.clip else X_new
+        X = np.minimum(np.maximum(X_new, 0.), 1.) if self.clip else X_new
 
         return X
