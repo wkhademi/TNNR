@@ -29,13 +29,13 @@ class ADMM(Optimizer):
         self.clip = config.clip
 
     def minimize(self, X, A, B, M_obs, observed):
-        M_norm = np.linalg.norm(M_obs)
         obj_val = 1e10
 
         # indiciator matrix indicating missing portions in image
         missing = np.ones_like(observed) - observed
 
         AB = A.T @ B  # precompute A^TB
+        X = M_obs
         W = X  # from constraint X = W in (17)
         Y = X  # initialize dual variable to X_1
 
@@ -56,8 +56,7 @@ class ADMM(Optimizer):
                             (self.rho/2)*(np.linalg.norm(X_new - W_new)**2) + np.trace(Y_new.T @ (X_new - W_new))
 
             # check stopping criteria
-            if np.linalg.norm(X_new - X) / M_norm <= self.tol or \
-                np.abs(obj_val_new - obj_val) <= self.tol:
+            if np.linalg.norm(X_new - X) <= self.tol:
                 break
 
             X = X_new
@@ -65,8 +64,7 @@ class ADMM(Optimizer):
             Y = Y_new
             obj_val = obj_val_new
 
-        #X = X_new*missing + M_obs  # fix values at observed entries
-        X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
+        X = X_new
 
         return X
 
@@ -90,6 +88,7 @@ class APGL(Optimizer):
 
         AB = A.T @ B  # precompute A^TB
         t = 1
+        X = M_obs
         Y = X  # initialize extrapolation point to X_1
 
         for itr in range(self.max_itrs):
@@ -108,13 +107,13 @@ class APGL(Optimizer):
                             (self.lam/2)*np.linalg.norm((X_new - M_obs)*observed)**2
 
             # check if objective value got worse, if so stop
-            if obj_val_new > obj_val:
-                X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
-                return X
+            #if obj_val_new > obj_val:
+            #    X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
+            #    return X
 
             # check stopping criteria
-            if np.linalg.norm(X_new - X) / M_norm <= self.tol or \
-                np.abs(obj_val_new - obj_val) <= self.tol:
+            if np.linalg.norm(X_new - X) <= self.tol: #/ M_norm <= self.tol or \
+                #np.abs(obj_val_new - obj_val) <= self.tol:
                 break
 
             X = X_new

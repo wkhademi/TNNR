@@ -13,13 +13,12 @@ OPT = {'admm': optimizers.ADMM,
        'apgl': optimizers.APGL}
 
 
-def solve(X_gt, M_obs, observed, r, config):
+def solve(M_obs, observed, r, config):
     '''
     Iterative scheme described in Algorithm 1 of "Matrix Completion by Truncated
     Nuclear Norm Regularization" by Zhang et al.
 
     Args:
-        X_gt: ground truth image
         M_obs: observed portion of image X_gt
         observed: indicator matrix indicating whether index in image is observed or not
         r: number for truncated nuclear norm (i.e., truncated nuclear norm is
@@ -67,9 +66,9 @@ def runner(config):
         X_gt, X_obs, observed = img_utils.generate_synthetic_data(m, n, config.r,
                                                                   config.p, config.sigma)
     else:  # load image and generate corruption of it
-        X_gt, X_obs, observed = img_utils.load_data(config.data_root, config.dataset,
-                                                    config.img_num, config.corruption,
-                                                    config)
+        X_gt, X_obs, observed, min_val, max_val = img_utils.load_data(config.data_root, config.dataset,
+                                                                      config.img_num, config.corruption,
+                                                                      config)
 
     num_channels = X_obs.shape[-1]
     best_metric = 1e10 if num_channels == 1 else -1e10
@@ -78,14 +77,16 @@ def runner(config):
 
     # solve for complete image (solve for all r \in [min_rank, max_rank] and select best)
     for r in range(config.min_rank, config.max_rank+1):
-        X_sol = solve(X_gt, X_obs, observed, r, config)
+        X_sol = solve(X_obs, observed, r, config)
+        plt.imshow(X_sol)
+        plt.show()
 
         # evaluate metric
         if num_channels == 1:
-            metric = metric_utils.error(X_sol, X_gt, observed)
+            metric = metric_utils.error(X_sol, X, observed)
             better = metric < best_metric
         elif num_channels == 3:
-            metric = metric_utils.PSNR(X_sol, X_gt, observed)
+            metric = metric_utils.PSNR(X_sol, X_gt, observed, min_val, max_val)
             better = metric > best_metric
 
         if better:
@@ -93,9 +94,9 @@ def runner(config):
             best_r = r
             best_X_sol = X_sol
 
-    # print metric for best image completion (i.e., best choice of r)
-    metric = 'Error' if num_channels == 1 else 'PSNR'
-    print('%s (r = %d): %f'%(metric, best_r, best_metric))
+        # print metric for best image completion (i.e., best choice of r)
+        metric_name = 'Error' if num_channels == 1 else 'PSNR'
+        print('%s (r = %d): %f'%(metric_name, r, metric))
 
     # save best image inpainting result
     if config.dataset != 'synthetic':
@@ -111,7 +112,7 @@ if __name__ == '__main__':
         help='Path to directory containing the data')
     parser.add_argument('--dataset', type=str, default='real',
         help='Dataset used for solving matrix completion problem. Options are: ' + \
-        '[real | synthetic | depth | microscopy]')
+        '[real | synthetic | depth]')
     parser.add_argument('--img_num', type=int, default=1,
         help='Image number to load in from dataset.')
     parser.add_argument('--corruption', type=str, default='text',
@@ -142,9 +143,9 @@ if __name__ == '__main__':
         help='max number of iterations to run algorithm for.')
     parser.add_argument('--opt_max_itrs', type=int, default=100,
         help='max number of iterations to run optimizer for at each iteration of algorithm.')
-    parser.add_argument('--alg_tol', type=float, default=1e-5,
+    parser.add_argument('--alg_tol', type=float, default=1e-6,
         help='Tolerance for stopping criteria of algorithm.')
-    parser.add_argument('--opt_tol', type=float, default=1e-5,
+    parser.add_argument('--opt_tol', type=float, default=1e-6,
         help='Tolerance for stopping criteria of optimizer used at each iteration.')
     parser.add_argument('--rho', type=float, default=1.,
         help='weighting parameter for augmented Lagrangian used by ADMM.')

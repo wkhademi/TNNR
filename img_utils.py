@@ -3,6 +3,7 @@ import numpy as np
 import matplotlib.pyplot as plt
 
 from PIL import Image
+from pypfm import PFMLoader
 
 
 def save(X, root, dataset, img_num):
@@ -39,9 +40,78 @@ def load_mask(data_root, mask, height, width):
     mask_path = os.path.join(data_root, 'masks', 'block_%s.bmp'%mask)
     mask = Image.open(mask_path)
     mask = mask.resize((width, height))
-    observed = np.asarray(mask) / 255.
+    mask = np.asarray(mask) / 255.
+
+    observed = np.ones_like(mask[..., 0])
+    observed[mask[...,0] < 1] = 0.
+    observed[mask[...,1] < 1] = 0.
+    observed[mask[...,2] < 1] = 0.
+    observed = np.repeat(observed[..., None], 3, axis=-1)
 
     return observed
+
+
+def load_image(data_root, dataset, img_num):
+    '''
+    Load JPG image from specified path.
+    '''
+    img_path = os.path.join(data_root, dataset, '%d.jpg'%img_num)
+    img = Image.open(img_path)
+
+    # normalize image
+    min_val = 0
+    max_val = 255
+    X_gt = (np.asarray(img) - min_val) / (max_val - min_val)
+
+    s0 = np.linalg.svd(X_gt[..., 0], compute_uv=False)
+    s1 = np.linalg.svd(X_gt[..., 1], compute_uv=False)
+    s2 = np.linalg.svd(X_gt[..., 2], compute_uv=False)
+    plt.plot(list(range(len(s0))), s0, 'r')
+    plt.plot(list(range(len(s1))), s1, 'g')
+    plt.plot(list(range(len(s2))), s2, 'b')
+    plt.show()
+
+    return X_gt, min_val, max_val
+
+
+def load_depth_map(data_root, dataset, img_num):
+    '''
+    Load depth map from specified path.
+    '''
+    calib_path = os.path.join(data_root, dataset, 'calib%d.txt'%img_num)
+
+    # load calibration file containing relevant parameters
+    calib_dict = {}
+    with open(calib_path) as calib_file:
+        for line in calib_file:
+            name, val = line.partition('=')[::2]
+            calib_dict[name] = val
+
+    width = int(calib_dict['width'])
+    height = int(calib_dict['height'])
+    min_val = int(calib_dict['vmin'])
+    max_val = int(calib_dict['vmax'])
+
+    # load depth map
+    loader = PFMLoader((width, height), color=False, compress=False)
+    depth_path = os.path.join(data_root, dataset, 'disp%d.pfm'%img_num)
+    depth = np.flip(loader.load_pfm(depth_path), axis=0)
+    depth[depth == np.inf] = 0.
+
+    # normalize depth map
+    X_gt = (depth - min_val) / (max_val - min_val)
+    X_gt[X_gt < 0] = 0.
+
+    # resize depth map
+    img = Image.fromarray(X_gt)
+    X_gt = np.array(img.resize((300, 300)))[..., None]
+
+    # plot singular values
+    s = np.linalg.svd(X_gt[...,0], compute_uv=False)
+    plt.plot(list(range(len(s))), s)
+    plt.show()
+
+    return X_gt, min_val, max_val
 
 
 def corrupt(X, corruption, data_root, config):
@@ -58,6 +128,9 @@ def corrupt(X, corruption, data_root, config):
     elif corruption == 'block':
         observed = load_mask(data_root, config.block_type, *X.shape[:2])
 
+    if X.shape != observed.shape:
+        observed = observed[..., :1]
+
     X_obs = X*observed
 
     return X_obs, observed
@@ -67,18 +140,19 @@ def load_data(data_root, dataset, img_num, corruption, config):
     '''
     Load ground truth image and generate a corrupted version of it.
     '''
-    # load image
-    img_path = os.path.join(data_root, dataset, '%d.jpg'%img_num)
-    img = Image.open(img_path)
-    X_gt = np.asarray(img) / 255.
+    if dataset == 'real':  # load image
+        X_gt, min_val, max_val = load_image(data_root, dataset, img_num)
+    elif dataset == 'depth':  # load depth map
+        X_gt, min_val, max_val = load_depth_map(data_root, dataset, img_num)
 
     # generate corruption of image
-    X_obs, observed = corrupt(X_gt, corruption, data_root, config)
+    if corruption != 'none':
+        X_obs, observed = corrupt(X_gt, corruption, data_root, config)
 
     # add Gaussian white noise to observed entries
     X_obs = add_noise(X_obs, observed, config.sigma)
 
-    return X_gt, X_obs, observed
+    return X_gt, X_obs, observed, min_val, max_val
 
 
 def generate_synthetic_data(m, n, r, p, sigma):

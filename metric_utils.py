@@ -1,4 +1,5 @@
 import numpy as np
+import matplotlib.pyplot as plt
 
 
 def error(X_sol, X_gt, observed):
@@ -8,7 +9,7 @@ def error(X_sol, X_gt, observed):
             error = ||(X_sol - X_gt)_miss||_F
     '''
     missing = np.ones_like(observed) - observed
-    error = np.linalg.norm(255.*(X_sol - X_gt)*missing)
+    error = np.linalg.norm((X_sol - X_gt)*missing)
 
     return error
 
@@ -27,19 +28,23 @@ def MSE(X_sol, X_gt, observed):
 
     squared_error = error_r**2 + error_g**2 + error_b**2
 
-    N = np.sum(np.ones_like(observed) - observed)  # compute number of missing pixels
-    mse = squared_error / (3*N)
+    N = np.sum(np.ones_like(observed) - observed)  # compute 3*number of missing pixels
+    mse = squared_error / N
 
     return mse
 
 
-def PSNR(X_sol, X_gt, observed):
+def PSNR(X_sol, X_gt, observed, min_val, max_val):
     '''
     Compute the Peak Signal-to-Noise Ration (PSNR) on the missing pixels that
     were predicted:
 
             PSNR = 10 * log_10(255**2 / MSE)
     '''
+    # unnormalize images
+    X_sol = (max_val - min_val)*X_sol + min_val
+    X_gt = (max_val - min_val)*X_gt + min_val
+
     mse = MSE(X_sol, X_gt, observed)
     psnr = 10. * np.log10(255**2 / mse)
 
