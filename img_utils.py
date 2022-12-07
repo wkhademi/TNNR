@@ -6,11 +6,11 @@ from PIL import Image
 from pypfm import PFMLoader
 
 
-def save(X, root, dataset, img_num):
+def save(X, root, dataset, optimizer, img_num):
     '''
     Save image to specified directory.
     '''
-    save_path = os.path.join(root, dataset, '%d.jpg'%img_num)
+    save_path = os.path.join(root, dataset, '%s_%d.jpg'%(optimizer, img_num))
     plt.axis('off')
     plt.imshow(X)
     plt.savefig(save_path, bbox_inches='tight')
@@ -63,12 +63,17 @@ def load_image(data_root, dataset, img_num):
     max_val = 255
     X_gt = (np.asarray(img) - min_val) / (max_val - min_val)
 
+    # plot singular values
     s0 = np.linalg.svd(X_gt[..., 0], compute_uv=False)
     s1 = np.linalg.svd(X_gt[..., 1], compute_uv=False)
     s2 = np.linalg.svd(X_gt[..., 2], compute_uv=False)
-    plt.plot(list(range(len(s0))), s0, 'r')
-    plt.plot(list(range(len(s1))), s1, 'g')
-    plt.plot(list(range(len(s2))), s2, 'b')
+    fig, ax = plt.subplots()
+    ax.plot(list(range(len(s0))), s0, 'r', label='red channel')
+    ax.plot(list(range(len(s1))), s1, 'g', label='green channel')
+    ax.plot(list(range(len(s2))), s2, 'b', label='blue channel')
+    ax.set_xlabel('i-th singular value')
+    ax.set_ylabel('magnitude')
+    ax.legend()
     plt.show()
 
     return X_gt, min_val, max_val
@@ -108,7 +113,10 @@ def load_depth_map(data_root, dataset, img_num):
 
     # plot singular values
     s = np.linalg.svd(X_gt[...,0], compute_uv=False)
-    plt.plot(list(range(len(s))), s)
+    fig, ax = plt.subplots()
+    ax.plot(list(range(len(s))), s)
+    ax.set_xlabel('i-th singular value')
+    ax.set_ylabel('magnitude')
     plt.show()
 
     return X_gt, min_val, max_val

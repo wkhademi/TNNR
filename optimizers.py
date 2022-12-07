@@ -26,7 +26,6 @@ class ADMM(Optimizer):
         super(ADMM, self).__init__(max_itrs, tol)
 
         self.rho = config.rho
-        self.clip = config.clip
 
     def minimize(self, X, A, B, M_obs, observed):
         obj_val = 1e10
@@ -35,7 +34,7 @@ class ADMM(Optimizer):
         missing = np.ones_like(observed) - observed
 
         AB = A.T @ B  # precompute A^TB
-        X = M_obs
+        X = M_obs  # intialize X to M_obs
         W = X  # from constraint X = W in (17)
         Y = X  # initialize dual variable to X_1
 
@@ -80,7 +79,38 @@ class APGL(Optimizer):
         super(APGL, self).__init__(max_itrs, tol)
 
         self.lam = config.lam
-        self.clip = config.clip
+
+    def p(self, Y, AB, M_obs, observed, L):
+        '''
+        Solve p_{L}(Y) = argmin_X Q(X, Y)
+        '''
+        grad = AB - self.lam*(Y - M_obs)*observed
+        X = alg_utils.shrinkage_operator(Y + (1./L)*grad, (1./L))
+
+        return X
+
+    def F(self, X, A, B, M_obs, observed):
+        '''
+        Evaluate F(X) = -Tr(AXB^T) + (lam/2)(||X_obs - M_obs||_F)^2
+        '''
+        f = -np.trace(A@X@B.T) + (self.lam/2)*np.linalg.norm((X - M_obs)*observed)**2
+
+        return f
+
+    def Q(self, X, Y, AB, A, B, M_obs, observed, L):
+        '''
+        Evaluate Q(X, Y) = F(Y) + <X-Y, grad_F(Y)> + (L/2)(||X-Y||_F)^2 + ||X||_*
+        '''
+        F_Y = self.F(Y, A, B, M_obs, observed)
+        XY = X - Y
+        grad_F_Y = AB - self.lam*(Y - M_obs)*observed
+        dot = np.trace(grad_F_Y.T @ XY)  # <X-Y, grad_F(Y)> = Tr(grad_F(Y)^T(X-Y))
+        frob_norm = np.linalg.norm(XY)
+        nuc_norm = np.linalg.norm(X, 'nuc')
+
+        q = F_Y + dot + (L/2.)*(frob_norm**2) + nuc_norm
+
+        return q
 
     def minimize(self, X, A, B, M_obs, observed):
         M_norm = np.linalg.norm(M_obs)
@@ -91,10 +121,25 @@ class APGL(Optimizer):
         X = M_obs
         Y = X  # initialize extrapolation point to X_1
 
+        # backtracking vars
+        eta = 1.1
+        L = 1e-5
+
         for itr in range(self.max_itrs):
+            # find appropriate step size with backtracking
+            #P = self.p(Y, AB, M_obs, observed, L)
+            #f = self.F(P, A, B, M_obs, observed)
+            #q = self.Q(P, Y, AB, A, B, M_obs, observed, L)
+            #while f > q:
+                #L *= eta
+                #P = self.p(Y, AB, M_obs, observed, L)
+                #f = self.F(P, A, B, M_obs, observed)
+                #q = self.Q(P, Y, AB, A, B, M_obs, observed, L)
+            #print(L)
+
             # STEP 1: update X iterate using shrinkage operator
             grad_f = AB - self.lam*(Y - M_obs)*observed
-            X_new = alg_utils.shrinkage_operator(Y + t*grad_f, t)
+            X_new = alg_utils.shrinkage_operator(Y + (1./self.lam)*grad_f, (1./self.lam))
 
             # STEP 2: update t iterate (same as nesterov's acceleration update)
             t_new = (1 + np.sqrt(1 + 4*(t**2))) / 2.
@@ -106,14 +151,8 @@ class APGL(Optimizer):
             obj_val_new = np.linalg.norm(X_new, 'nuc') - np.trace(A@X_new@B.T) + \
                             (self.lam/2)*np.linalg.norm((X_new - M_obs)*observed)**2
 
-            # check if objective value got worse, if so stop
-            #if obj_val_new > obj_val:
-            #    X = np.minimum(np.maximum(X, 0.), 1.) if self.clip else X
-            #    return X
-
             # check stopping criteria
-            if np.linalg.norm(X_new - X) <= self.tol: #/ M_norm <= self.tol or \
-                #np.abs(obj_val_new - obj_val) <= self.tol:
+            if np.linalg.norm(X_new - X) <= self.tol:
                 break
 
             X = X_new
@@ -121,6 +160,7 @@ class APGL(Optimizer):
             Y = Y_new
             obj_val = obj_val_new
 
-        X = np.minimum(np.maximum(X_new, 0.), 1.) if self.clip else X_new
+        #print(X_new[observed == 0])
+        X = X_new
 
         return X

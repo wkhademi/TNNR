@@ -1,4 +1,5 @@
 import os
+import time
 import argparse
 import numpy as np
 
@@ -13,7 +14,7 @@ OPT = {'admm': optimizers.ADMM,
        'apgl': optimizers.APGL}
 
 
-def solve(M_obs, observed, r, config):
+def solve(X_gt, M_obs, observed, r, config):
     '''
     Iterative scheme described in Algorithm 1 of "Matrix Completion by Truncated
     Nuclear Norm Regularization" by Zhang et al.
@@ -36,8 +37,6 @@ def solve(M_obs, observed, r, config):
     # solve for completed matrix (complete matrix per channel)
     num_channels = M_obs.shape[-1]
     for c in range(num_channels):
-        M_norm = np.linalg.norm(M_obs[..., c])
-
         X = M_obs[..., c]  # initialize X_1 to M_obs
 
         for iter in range(config.alg_max_itrs):
@@ -49,10 +48,13 @@ def solve(M_obs, observed, r, config):
             X_new = optimizer.minimize(X, A, B, M_obs[..., c], observed[..., c])
 
             # check stopping criteria
-            if np.linalg.norm(X_new - X) / M_norm <= config.alg_tol:
+            if np.linalg.norm(X_new - X) <= config.alg_tol:
                 break
 
             X = X_new
+
+            metric = metric_utils.error(X, X_gt[...,c], observed[...,c])
+            print('Error (r = %d): %f'%(r, metric))
 
         X_sol[..., c] = X_new
 
@@ -76,17 +78,23 @@ def runner(config):
     best_X_sol = X_obs
 
     # solve for complete image (solve for all r \in [min_rank, max_rank] and select best)
+    total_time = 0
     for r in range(config.min_rank, config.max_rank+1):
-        X_sol = solve(X_obs, observed, r, config)
-        plt.imshow(X_sol)
-        plt.show()
+        start = time.time()
+        X_sol = solve(X_gt, X_obs, observed, r, config)
+        end = time.time()
+        print('Runtime: %f'%(end-start))
+        total_time += (end-start)
 
         # evaluate metric
         if num_channels == 1:
-            metric = metric_utils.error(X_sol, X, observed)
+            metric = metric_utils.error(X_sol, X_gt, observed)
+            print('Error (r = %d): %f'%(r, metric))
             better = metric < best_metric
         elif num_channels == 3:
+            X_sol = np.minimum(np.maximum(0., X_sol), 1.)
             metric = metric_utils.PSNR(X_sol, X_gt, observed, min_val, max_val)
+            print('PSNR (r = %d): %f'%(r, metric))
             better = metric > best_metric
 
         if better:
@@ -94,14 +102,18 @@ def runner(config):
             best_r = r
             best_X_sol = X_sol
 
-        # print metric for best image completion (i.e., best choice of r)
-        metric_name = 'Error' if num_channels == 1 else 'PSNR'
-        print('%s (r = %d): %f'%(metric_name, r, metric))
+    print('Total runtime: %f'%total_time)
+
+    # print metric for best image completion (i.e., best choice of r)
+    metric_name = 'Error' if num_channels == 1 else 'PSNR'
+    print('Best %s (r = %d): %f'%(metric_name, r, metric))
 
     # save best image inpainting result
     if config.dataset != 'synthetic':
-        img_utils.save(X_obs, 'corrupt/', config.dataset, config.img_num)
-        img_utils.save(X_sol, 'results/', config.dataset, config.img_num)
+        if config.dataset == 'depth':
+            img_utils.save(X_obs, 'real/', config.dataset, config.optimizer, config.img_num)
+        img_utils.save(X_obs, 'corrupt/', config.dataset, config.optimizer, config.img_num)
+        img_utils.save(X_sol, 'results/', config.dataset, config.optimizer, config.img_num)
 
 
 if __name__ == '__main__':
@@ -143,15 +155,14 @@ if __name__ == '__main__':
         help='max number of iterations to run algorithm for.')
     parser.add_argument('--opt_max_itrs', type=int, default=100,
         help='max number of iterations to run optimizer for at each iteration of algorithm.')
-    parser.add_argument('--alg_tol', type=float, default=1e-6,
+    parser.add_argument('--alg_tol', type=float, default=1e-4,
         help='Tolerance for stopping criteria of algorithm.')
-    parser.add_argument('--opt_tol', type=float, default=1e-6,
+    parser.add_argument('--opt_tol', type=float, default=1e-4,
         help='Tolerance for stopping criteria of optimizer used at each iteration.')
     parser.add_argument('--rho', type=float, default=1.,
         help='weighting parameter for augmented Lagrangian used by ADMM.')
     parser.add_argument('--lam', type=float, default=0.06,
         help='weighting parameter used by APGL for soft-constraint formulation.')
-    parser.add_argument('--clip', action='store_true')
     config = parser.parse_args()
 
     print(config)
