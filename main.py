@@ -53,9 +53,6 @@ def solve(X_gt, M_obs, observed, r, config):
 
             X = X_new
 
-            metric = metric_utils.error(X, X_gt[...,c], observed[...,c])
-            print('Error (r = %d): %f'%(r, metric))
-
         X_sol[..., c] = X_new
 
     return X_sol
@@ -91,6 +88,7 @@ def runner(config):
             metric = metric_utils.error(X_sol, X_gt, observed)
             print('Error (r = %d): %f'%(r, metric))
             better = metric < best_metric
+            print(better)
         elif num_channels == 3:
             X_sol = np.minimum(np.maximum(0., X_sol), 1.)
             metric = metric_utils.PSNR(X_sol, X_gt, observed, min_val, max_val)
@@ -106,14 +104,14 @@ def runner(config):
 
     # print metric for best image completion (i.e., best choice of r)
     metric_name = 'Error' if num_channels == 1 else 'PSNR'
-    print('Best %s (r = %d): %f'%(metric_name, r, metric))
+    print('Best %s (r = %d): %f'%(metric_name, best_r, best_metric))
 
     # save best image inpainting result
     if config.dataset != 'synthetic':
         if config.dataset == 'depth':
-            img_utils.save(X_obs, 'real/', config.dataset, config.optimizer, config.img_num)
+            img_utils.save(X_gt, 'data/', config.dataset, config.optimizer, config.img_num)
         img_utils.save(X_obs, 'corrupt/', config.dataset, config.optimizer, config.img_num)
-        img_utils.save(X_sol, 'results/', config.dataset, config.optimizer, config.img_num)
+        img_utils.save(best_X_sol, 'results/', config.dataset, config.optimizer, config.img_num)
 
 
 if __name__ == '__main__':

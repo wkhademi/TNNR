@@ -17,15 +17,19 @@ To use the APGL algorithm with synthetic data (sigma=1) run:
 python3 main.py --data_root data/ --dataset synthetic --img_size 100 200 --r 15 --sigma 1 --p 0.7 --optimizer apgl --min_rank 15 --max_rank 15 --alg_max_itrs 50 --opt_max_itrs 25 --lam 0.04
 ```
 
-
-To use the ADMM algorithm on the dataset provided in the paper (e.g, for example image \#1) run:
+To use the ADMM algorithm on real data (e.g, for example image \#1) run:
 ```
 python3 main.py --data_root data/ --dataset real --img_num 1 --corruption text --sigma 0 --optimizer admm --min_rank 6 --max_rank 6 --alg_max_itrs 25 --opt_max_itrs 200 --rho 1
 ```
 
-To use the APGL algorithm on the dataset provided in the paper (e.g, for example image \#1) run:
+To use the APGL algorithm on real data (e.g, for example image \#1) run:
 ```
-python3 main.py --data_root data/ --dataset real --img_num 4 --corruption text --sigma 0 --optimizer apgl --min_rank 20 --max_rank 20 --alg_max_itrs 35 --opt_max_itrs 30 --lam 0.7
+python3 main.py --data_root data/ --dataset real --img_num 1 --corruption text --sigma 0 --optimizer apgl --min_rank 10 --max_rank 10 --alg_max_itrs 35 --opt_max_itrs 30 --lam 0.5
+```
+
+To use the ADMM algorithm on depth data (e.g, for example image \#0) run:
+```
+python3 main.py --data_root data/ --dataset depth --img_num 0 --corruption drop --rate 0.4 --sigma 0 --optimizer admm --min_rank 12 --max_rank 12 --alg_max_itrs 25 --opt_max_itrs 200 --rho 1
 ```
 
 To get the full list of command line options run:

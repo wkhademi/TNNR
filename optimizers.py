@@ -122,8 +122,8 @@ class APGL(Optimizer):
         Y = X  # initialize extrapolation point to X_1
 
         # backtracking vars
-        eta = 1.1
-        L = 1e-5
+        #eta = 1.1
+        #L = 1e-5
 
         for itr in range(self.max_itrs):
             # find appropriate step size with backtracking

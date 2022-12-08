@@ -12,8 +12,9 @@ def save(X, root, dataset, optimizer, img_num):
     '''
     save_path = os.path.join(root, dataset, '%s_%d.jpg'%(optimizer, img_num))
     plt.axis('off')
+    X = np.clip(X, 0., 1.)
     plt.imshow(X)
-    plt.savefig(save_path, bbox_inches='tight')
+    plt.savefig(save_path, bbox_inches='tight', vmin=0., vmax=1.)
 
 
 def add_noise(X, observed, sigma):

@@ -1,3 +1,6 @@
 __pycache__/
 corrupt/real/*.jpg
+corrupt/depth/*.jpg
 results/real/*.jpg
+results/depth/*.jpg
+results.txt
