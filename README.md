@@ -1,6 +1,6 @@
-# AI 539 Final Project
-Implementation of algorithms presented in "Matrix Completion by Truncated
-Nuclear Norm Regularization" by Zhang et al.
+# TNNR
+Python implementation of "Matrix Completion by Truncated
+Nuclear Norm Regularization" by Zhang et al. Both the alternating direction method of multipliers (ADMM) and accelerated proximal gradient line search method (APGL) are implemented.
 
 To run the code, first install the required packages by running:
 ```
